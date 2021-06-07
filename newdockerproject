@@ -1,0 +1,76 @@
+#!/bin/bash
+# this file should be sourced 
+
+if [ $# -eq 0 ]
+  then
+    echo "No arguments supplied"
+    exit 0
+fi
+
+if [ $# -lt 3 ]
+  then
+    echo "Argument missing, please check."
+    echo "=> newdockerproject PROJECT_NAME IMAGE_NAME POSTGRESQL_VERSION"
+    exit 0
+fi
+
+if [[ -z "$1" ]]; then
+    echo "Please specify a project name"
+    echo "For exemple : newdockerproject PROJECT_NAME IMAGE_NAME POSTGRESQL_VERSION"
+    exit 0
+fi
+
+PROJECT_NAME=$1
+IMAGE_NAME=$2
+POSTGRESQL_VERSION=$3
+WORK_PATH=~/workspace
+
+mkdir -p $WORK_PATH/$PROJECT_NAME/config
+mkdir -p $WORK_PATH/$PROJECT_NAME/custom_addons
+touch $WORK_PATH/$PROJECT_NAME/docker-compose.yml
+
+cat << EOF > $WORK_PATH/$PROJECT_NAME/docker-compose.yml
+version: '2'
+services:
+  odoo:
+    container_name: ${PROJECT_NAME}_odoo
+    image: $IMAGE_NAME
+    depends_on:
+      - db
+    ports:
+      - 8069:8069
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=odoo
+      - DB_PASSWORD=odoo
+    volumes:
+      - $PROJECT_NAME-odoo-data:/opt/odoo/data
+      - ./config:/etc/odoo
+      - ./custom_addons:/opt/odoo/custom_addons
+    stdin_open: true
+    tty: true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  db:
+    container_name: ${PROJECT_NAME}_db
+    image: postgres:$POSTGRESQL_VERSION
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=odoo
+      - POSTGRES_USER=odoo
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - $PROJECT_NAME-db-data:/var/lib/postgresql/data/pgdata
+      - $PROJECT_NAME-backups-data:/backups
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+volumes:
+  $PROJECT_NAME-odoo-data:
+  $PROJECT_NAME-db-data:
+  $PROJECT_NAME-backups-data:
+EOF
+
+cd $WORK_PATH/$PROJECT_NAME/ && ls -lah
