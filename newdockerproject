@@ -25,18 +25,29 @@ IMAGE_NAME=$2
 POSTGRESQL_VERSION=$3
 WORK_PATH=~/workspace
 
+mkdir -p $WORK_PATH/$PROJECT_NAME/docker
 mkdir -p $WORK_PATH/$PROJECT_NAME/config
+mkdir -p $WORK_PATH/$PROJECT_NAME/scripts
 mkdir -p $WORK_PATH/$PROJECT_NAME/custom_addons
-touch $WORK_PATH/$PROJECT_NAME/docker-compose.yml
 
+echo "Creating empty Dockerfile file..."
+cat << EOF > $WORK_PATH/$PROJECT_NAME/docker/Dockerfile
+# EDIT ME
+EOF
+
+echo "Creating docker-compose.yml file..."
 cat << EOF > $WORK_PATH/$PROJECT_NAME/docker-compose.yml
 version: '2'
 services:
   odoo:
     container_name: ${PROJECT_NAME}_odoo
     image: $IMAGE_NAME
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
     depends_on:
       - db
+    command: odoo
     ports:
       - 8069:8069
     environment:
@@ -48,10 +59,9 @@ services:
       - $PROJECT_NAME-odoo-data:/opt/odoo/data
       - ./config:/etc/odoo
       - ./custom_addons:/opt/odoo/custom_addons
+      - ./scripts:/opt/odoo/scripts
     stdin_open: true
     tty: true
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
   db:
     container_name: ${PROJECT_NAME}_db
     image: postgres:$POSTGRESQL_VERSION
@@ -67,10 +77,95 @@ services:
     image: adminer
     ports:
       - 8080:8080
+  mailcatcher:
+    image: yappabe/mailcatcher
+    ports:
+    - 1080:1080
+    - 1025:1025
 volumes:
   $PROJECT_NAME-odoo-data:
   $PROJECT_NAME-db-data:
   $PROJECT_NAME-backups-data:
 EOF
+
+echo "Creating docker-compose-debug.yml file..."
+cat << EOF > $WORK_PATH/$PROJECT_NAME/docker-compose-upgrade.yml
+version: '2'
+services:
+  odoo:
+    command: debug
+    ports:
+      - 8888:3001
+      - 8879:8069
+      - 8069:8069
+EOF
+
+echo "Creating odoo.conf file..."
+cat << EOF > $WORK_PATH/$PROJECT_NAME/config/odoo.conf
+[options]
+; SAMPLE FILE, EDIT ME
+addons_path = /opt/odoo/odoo/odoo/addons,/opt/odoo/odoo/addons
+admin_passwd = admin_passwd
+csv_internal_sep = ,
+data_dir = /opt/odoo/data
+db_host = db
+db_maxconn = 64
+db_name = False
+db_password = odoo
+db_port = 5432
+db_sslmode = prefer
+db_template = template0
+db_user = odoo
+dbfilter = $PROJECT_NAME.*
+demo = {}
+email_from = False
+from_filter = False
+geoip_database = /usr/share/GeoIP/GeoLite2-City.mmdb
+http_enable = True
+http_interface = 
+http_port = 8069
+import_partial = 
+limit_memory_hard = 2684354560
+limit_memory_soft = 2147483648
+limit_request = 8192
+limit_time_cpu = 60
+limit_time_real = 1200
+limit_time_real_cron = -1
+list_db = True
+log_db = False
+log_db_level = warning
+log_handler = :INFO
+log_level = info
+logfile = 
+longpolling_port = 8072
+max_cron_threads = 2
+osv_memory_age_limit = False
+osv_memory_count_limit = False
+pg_path = 
+pidfile = 
+proxy_mode = False
+reportgz = False
+screencasts = 
+screenshots = /tmp/odoo_tests
+server_wide_modules = base,web
+smtp_password = False
+smtp_port = 25
+smtp_server = localhost
+smtp_ssl = False
+smtp_ssl_certificate_filename = False
+smtp_ssl_private_key_filename = False
+smtp_user = False
+syslog = False
+test_enable = False
+test_file = 
+test_tags = None
+transient_age_limit = 1.0
+translate_modules = ['all']
+unaccent = False
+without_demo = False
+workers = 0
+EOF
+
+
 
 cd $WORK_PATH/$PROJECT_NAME/ && ls -lah
